@@ -65,10 +65,10 @@ class SyntheticDataGeneratorPlus:
             np.random.rand(size, self.p),
             columns=[f'X{i+1}' for i in range(self.p)]
         )
-        if self.scenario == 7:
-            U = np.random.rand(size, 2)
-            U = 1 - U
-            df['U1'], df['U2'] = U[:,0], U[:,1]
+        # unobserved confounders
+        U = np.random.rand(size, 2)
+        U = 1 - U
+        df['U1'], df['U2'] = U[:,0], U[:,1]
         return df
 
     def _add_treatment(self, df):
