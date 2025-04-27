@@ -6,20 +6,24 @@ from scipy.stats import beta, bernoulli
 
 class SyntheticDataGeneratorPlus:
     """
-    Generate synthetic survival data scenarios (1–10) with Cox-based event and censoring times where appropriate.
+    Generate synthetic survival data scenarios (1-10) with Cox-based event and censoring times where appropriate.
 
     Each dataset includes:
       - train, test_random, test_quantiles
       - metadata dictionary
 
-    Scenarios 2 & 10: T ~ Cox model with Weibull(λ=1,k=0.5) baseline and λ(t)=0.5 t^-0.5 e^{lp(X,W)}
-    Scenarios 1 & 9: C ~ Cox model with Weibull(λ=1,k=2.0) baseline and λ(t)=2 t e^{lp_C(X,W)}
-
     All other scenarios remain as before.
     """
     def __init__(self, scenario=1, n_samples=5000, n_features=5,
-                 random_state=None, dataset_name=None, RCT=False, treatment_proportion=0.5):
-        assert 1 <= scenario <= 10, "Scenario must be 1–10"
+                 random_state=None, dataset_name=None, 
+                 RCT=True, treatment_proportion=0.5, unobserved=False):
+        '''
+        unobserved: bool
+            only used if RCT == False
+            If True, add unobserved confounders to the dataset, i.e. propensity score e(X, U).
+            If RCT == False and unobserved == False, then propensity score is e(X).
+        '''
+        assert 1 <= scenario <= 10, "Scenario must be 1-10"
         self.scenario = scenario
         self.n = n_samples
         self.p = n_features
@@ -27,7 +31,18 @@ class SyntheticDataGeneratorPlus:
         self.dataset_name = dataset_name or f"scenario_{scenario}"
         self.rct = RCT
         self.treatment_proportion = treatment_proportion # only used if RCT=True
+        self.unobserved = unobserved
         np.random.seed(self.random_state)
+        self._meta = {
+            'dataset_name': self.dataset_name,
+            'scenario': self.scenario,
+            'n_samples': self.n,
+            'n_features': self.p,
+            'RCT': self.rct,
+            'treatment_proportion': self.treatment_proportion,
+            'unobserved': self.unobserved,
+            'random_state': self.random_state
+        }
 
     def _simulate_cox(self, linpred, baseline, params):
         """
@@ -52,6 +67,7 @@ class SyntheticDataGeneratorPlus:
         )
         if self.scenario == 7:
             U = np.random.rand(size, 2)
+            U = 1 - U
             df['U1'], df['U2'] = U[:,0], U[:,1]
         return df
 
@@ -59,17 +75,34 @@ class SyntheticDataGeneratorPlus:
         df = df.copy()
         if self.rct:
             # Randomized treatment assignment
-            W = np.random.binomial(1, self.treatment_proportion, size=len(df))
+            p = self.treatment_proportion
+            W = np.random.binomial(1, p, size=len(df))
+            self._meta['propensity_type'] = 'RCT'
+            self._meta['propensity_params'] = {'p': p}
         else:
             X = df[[c for c in df.columns if c.startswith('X')]].values
-            beta_pdf = beta.pdf(X[:, 0], 2, 4)
-            e = (1 + beta_pdf) / 4 # propensity score e(X)
-            W = bernoulli.rvs(e, size=(1, X.shape[0])).flatten()
-        # TODO: add setting with unobserved confounders: e(X, U)
+            if not self.unobserved:
+                # e(X) via Beta PDF on X[:,0]
+                pdf_vals = beta.pdf(X[:, 0], 2, 4)
+                e = (1 + pdf_vals) / 4 # propensity score e(X)
+                self._meta['propensity_type'] = 'e(X)'
+            else:
+                # Unobserved confounders: e(X,U) via Beta PDF on (0.3*X[:,0] + 0.7*U1)
+                U = df[['U1', 'U2']].values
+                lin = 0.3 * X[:, 0] + 0.7 * U[:, 0]
+                pdf_vals = beta.pdf(lin, 2, 4)
+                e = (1 + pdf_vals) / 4 # propensity score e(X)
+                self._meta['propensity_type'] = 'e(X,U)'
+            self._meta['propensity_params'] = {'beta_a': 2, 'beta_b': 4}
+            W = bernoulli.rvs(e, size=X.shape[0])
         df['W'] = W
         return df
 
-    def _simulate_T(self, df):
+    def _simulate_T(self, df, W_forced=None):
+        # TODO: add counterfactual T
+        if W_forced is not None:
+            df = df.copy()
+            df['W'] = W_forced
         X = df[[c for c in df.columns if c.startswith('X')]].values
         W = df['W'].values
         s = self.scenario
@@ -147,46 +180,31 @@ class SyntheticDataGeneratorPlus:
         raise ValueError("Unsupported scenario for C")
 
     def generate_datasets(self):
-        # train, random test, quantile test
-        df_train = self._add_treatment(self._gen_X(self.n))
-        df_train['true_event_time'] = self._simulate_T(df_train)
-        df_train['true_censor_time'] = self._simulate_C(df_train)
-        df_train['observed_time'], df_train['event'] = (
-            np.minimum(df_train['true_event_time'], df_train['true_censor_time']),
-            (df_train['true_event_time'] <= df_train['true_censor_time']).astype(int)
-        )
-        df_train['id'] = np.arange(self.n)
-        # random test
-        df_rand = self._add_treatment(self._gen_X(self.n))
-        df_rand['true_event_time'] = self._simulate_T(df_rand)
-        df_rand['true_censor_time'] = self._simulate_C(df_rand)
-        df_rand['observed_time'], df_rand['event'] = (
-            np.minimum(df_rand['true_event_time'], df_rand['true_censor_time']),
-            (df_rand['true_event_time'] <= df_rand['true_censor_time']).astype(int)
-        )
-        df_rand['id'] = np.arange(self.n)
-        # quantile test
-        qs = np.linspace(0,1,21)
-        Xq = np.tile(qs, (1, self.p)).reshape(21, self.p)
-        df_q = pd.DataFrame(Xq, columns=[f'X{i+1}' for i in range(self.p)])
-        if self.scenario == 7:
-            for j in range(2): df_q[f'U{j+1}'] = qs
-        df_q = self._add_treatment(df_q)
-        df_q['true_event_time'] = self._simulate_T(df_q)
-        df_q['true_censor_time'] = self._simulate_C(df_q)
-        df_q['observed_time'], df_q['event'] = (
-            np.minimum(df_q['true_event_time'], df_q['true_censor_time']),
-            (df_q['true_event_time'] <= df_q['true_censor_time']).astype(int)
-        )
-        df_q['id'] = np.arange(len(df_q))
-        metadata = dict(
-            dataset_name=self.dataset_name,
-            scenario=self.scenario,
-            n_samples=self.n,
-            n_features=self.p,
-            random_state=self.random_state
-        )
-        return {'train':df_train, 'test_random':df_rand, 'test_quantiles':df_q, 'metadata':metadata}
+        def build_df(n):
+            Xdf = self._gen_X(n)
+            Xdf = self._add_treatment(Xdf)
+            # true potential outcomes
+            T0 = self._simulate_T(Xdf, W_forced=np.zeros(len(Xdf), dtype=int))
+            T1 = self._simulate_T(Xdf, W_forced=np.ones(len(Xdf), dtype=int))
+            # factual event & censoring
+            T_f = np.where(Xdf['W']==1, T1, T0)
+            C  = self._simulate_C(Xdf)
+            obs = np.minimum(T_f, C)
+            df = Xdf.copy()
+            df['T0'] = T0
+            df['T1'] = T1
+            df['T'] = T_f
+            df['C'] = C
+            df['observed_time'] = obs
+            df['event'] = (T_f <= C).astype(int)
+            df['id'] = np.arange(len(df))
+            df = df[['id', 'observed_time', 'event'] + [c for c in df.columns if c not in ['id', 'observed_time', 'event']]]
+            return df
+        
+        df_train = build_df(self.n)
+        df_rand  = build_df(self.n)
+
+        return {'train':df_train, 'test':df_rand, 'metadata': self._meta}
 
 class SyntheticDataGenerator:
     """
