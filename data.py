@@ -16,12 +16,21 @@ class SyntheticDataGeneratorPlus:
     """
     def __init__(self, scenario=1, n_samples=5000, n_features=5,
                  random_state=None, dataset_name=None, 
-                 RCT=True, treatment_proportion=0.5, unobserved=False):
+                 RCT=True, treatment_proportion=0.5, unobserved=False,
+                 informative_censoring=False, info_censor_baseline=1.0, info_censor_alpha=0.1):
         '''
         unobserved: bool
             only used if RCT == False
             If True, add unobserved confounders to the dataset, i.e. propensity score e(X, U).
             If RCT == False and unobserved == False, then propensity score is e(X).
+        informative_censoring: bool
+            If True, ignore the scenario's original C-generation and
+            instead draw
+                C_i ~ Exp(rate = info_censor_baseline + info_censor_alpha * T_i)
+        info_censor_baseline: float
+            lambda_0 in the rate
+        info_censor_alpha: float
+            alpha in the rate
         '''
         assert 1 <= scenario <= 10, "Scenario must be 1-10"
         self.scenario = scenario
@@ -32,6 +41,9 @@ class SyntheticDataGeneratorPlus:
         self.rct = RCT
         self.treatment_proportion = treatment_proportion # only used if RCT=True
         self.unobserved = unobserved
+        self.informative_censoring = informative_censoring
+        self.info_censor_baseline = info_censor_baseline
+        self.info_censor_alpha = info_censor_alpha
         np.random.seed(self.random_state)
         self._meta = {
             'dataset_name': self.dataset_name,
@@ -41,7 +53,8 @@ class SyntheticDataGeneratorPlus:
             'RCT': self.rct,
             'treatment_proportion': self.treatment_proportion,
             'unobserved': self.unobserved,
-            'random_state': self.random_state
+            'random_state': self.random_state,
+            'informative_censoring': self.informative_censoring
         }
 
     def _simulate_cox(self, linpred, baseline, params):
@@ -138,63 +151,76 @@ class SyntheticDataGeneratorPlus:
     def _simulate_C(self, df):
         X = df[[c for c in df.columns if c.startswith('X')]].values
         W = df['W'].values
-        s = self.scenario
-        # Cox-based C for scenarios 1 & 9
-        if s in (1, 9):
-            if s == 1:
-                lpC = -1.75 -0.5*np.sqrt(X[:,1]) +0.2*X[:,2]
-                lpC += (1.15 +0.5*(X[:,0]<0.5) -0.3*np.sqrt(X[:,1])) * W
-            else:  # s==9
-                lpC = -0.9 +2*np.sqrt(X[:,1]) +2*X[:,2]
-                lpC += (1.15 +0.5*(X[:,0]<0.5) -0.3*np.sqrt(X[:,1])) * W
-            return self._simulate_cox(lpC, 'weibull', {'lambda':1.0, 'k':2.0})
-        # Uniform scenario 2
-        if s == 2:
-            return np.random.uniform(0,3, size=len(df))
-        # Poisson scenarios 3,4
-        if s in (3,4):
-            lam = (12 if s == 3 else 1) + np.log1p(np.exp(X[:,2]))
-            return np.random.poisson(lam)
-        # piecewise uniform 5
-        if s == 5:
-            u = np.random.rand(len(df)) # Uniform(0,1)
-            # if s < 0.6, return inf
-            return np.where(u < 0.6, np.inf, 1 + (X[:,3] < 0.5).astype(int))
-        # Poisson 6,7,8
-        if s in (6,7,8):
-            if s == 6:
-                lam = 3 + np.log1p(np.exp(2*X[:,1] + X[:,2]))
-            elif s == 7: # unknown mechanism censoring
-                # TODO: add dependent time to censoring and time to event with U
-                U = df[['U1','U2']].values
-                lam = 3 + 4*U[:,0] + 2*U[:,1]
-            else:
-                lam = 3
-            return np.random.poisson(lam, size=len(df))
-        # interval-censor 10
-        if s == 10:
-            u = np.random.rand(len(df))
-            c1 = np.inf
-            c2 = np.random.uniform(0, 0.05,size=len(df))
-            return np.where(u<0.1, c1, c2)
-        raise ValueError("Unsupported scenario for C")
+        T_true = df['T'].values
+        if self.informative_censoring:
+            self._meta['info_censor_baseline'] = self.info_censor_baseline
+            self._meta['info_censor_alpha'] = self.info_censor_alpha
+            # informative censoring: rate depends on T_true
+            lam0  = self.info_censor_baseline
+            alpha = self.info_censor_alpha
+            rates = lam0 + alpha * T_true
+            # Exponential(scale=1/rates)
+            return np.random.exponential(scale=1.0/rates, size=len(df))
+        else:
+            s = self.scenario
+            # Cox-based C for scenarios 1 & 9
+            if s in (1, 9):
+                if s == 1:
+                    lpC = -1.75 -0.5*np.sqrt(X[:,1]) +0.2*X[:,2]
+                    lpC += (1.15 +0.5*(X[:,0]<0.5) -0.3*np.sqrt(X[:,1])) * W
+                else:  # s==9
+                    lpC = -0.9 +2*np.sqrt(X[:,1]) +2*X[:,2]
+                    lpC += (1.15 +0.5*(X[:,0]<0.5) -0.3*np.sqrt(X[:,1])) * W
+                return self._simulate_cox(lpC, 'weibull', {'lambda':1.0, 'k':2.0})
+            # Uniform scenario 2
+            if s == 2:
+                return np.random.uniform(0,3, size=len(df))
+            # Poisson scenarios 3,4
+            if s in (3,4):
+                lam = (12 if s == 3 else 1) + np.log1p(np.exp(X[:,2]))
+                return np.random.poisson(lam)
+            # piecewise uniform 5
+            if s == 5:
+                u = np.random.rand(len(df)) # Uniform(0,1)
+                # if s < 0.6, return inf
+                return np.where(u < 0.6, np.inf, 1 + (X[:,3] < 0.5).astype(int))
+            # Poisson 6,7,8
+            if s in (6,7,8):
+                if s == 6:
+                    lam = 3 + np.log1p(np.exp(2*X[:,1] + X[:,2]))
+                elif s == 7: # unknown mechanism censoring
+                    # TODO: add dependent time to censoring and time to event with U
+                    U = df[['U1','U2']].values
+                    lam = 3 + 4*U[:,0] + 2*U[:,1]
+                else:
+                    lam = 3
+                return np.random.poisson(lam, size=len(df))
+            # interval-censor 10
+            if s == 10:
+                u = np.random.rand(len(df))
+                c1 = np.inf
+                c2 = np.random.uniform(0, 0.05,size=len(df))
+                return np.where(u<0.1, c1, c2)
+            raise ValueError("Unsupported scenario for C")
 
     def generate_datasets(self):
         def build_df(n):
             Xdf = self._gen_X(n)
             Xdf = self._add_treatment(Xdf)
+            df = Xdf.copy()
             # true potential outcomes
             T0 = self._simulate_T(Xdf, W_forced=np.zeros(len(Xdf), dtype=int))
             T1 = self._simulate_T(Xdf, W_forced=np.ones(len(Xdf), dtype=int))
-            # factual event & censoring
-            T_f = np.where(Xdf['W']==1, T1, T0)
-            C  = self._simulate_C(Xdf)
-            obs = np.minimum(T_f, C)
-            df = Xdf.copy()
             df['T0'] = T0
             df['T1'] = T1
+            # factual event time
+            T_f = np.where(Xdf['W']==1, T1, T0)
             df['T'] = T_f
+            # factual censoring time
+            C  = self._simulate_C(df)
+            obs = np.minimum(T_f, C)
             df['C'] = C
+            # observed time and event indicator
             df['observed_time'] = obs
             df['event'] = (T_f <= C).astype(int)
             df['id'] = np.arange(len(df))
@@ -202,9 +228,9 @@ class SyntheticDataGeneratorPlus:
             return df
         
         df_train = build_df(self.n)
-        df_rand  = build_df(self.n)
 
-        return {'train':df_train, 'test':df_rand, 'metadata': self._meta}
+        return {'data':df_train, 
+                'metadata': self._meta}
 
 class SyntheticDataGenerator:
     """
