@@ -51,10 +51,9 @@ class SyntheticDataGeneratorPlus:
             'n_samples': self.n,
             'n_features': self.p,
             'RCT': self.rct,
-            'treatment_proportion': self.treatment_proportion,
             'unobserved': self.unobserved,
+            'informative_censoring': self.informative_censoring,
             'random_state': self.random_state,
-            'informative_censoring': self.informative_censoring
         }
 
     def _simulate_cox(self, linpred, baseline, params):
@@ -91,7 +90,7 @@ class SyntheticDataGeneratorPlus:
             p = self.treatment_proportion
             W = np.random.binomial(1, p, size=len(df))
             self._meta['propensity_type'] = 'RCT'
-            self._meta['propensity_params'] = {'p': p}
+            self._meta['treatment_proportion'] = p,
         else:
             X = df[[c for c in df.columns if c.startswith('X')]].values
             if not self.unobserved:
@@ -112,7 +111,6 @@ class SyntheticDataGeneratorPlus:
         return df
 
     def _simulate_T(self, df, W_forced=None):
-        # TODO: add counterfactual T
         if W_forced is not None:
             df = df.copy()
             df['W'] = W_forced
@@ -124,27 +122,32 @@ class SyntheticDataGeneratorPlus:
         if s in (2, 10):
             # linpred = X1 + (-0.5+X2)*W
             linpred = X[:,0] + (-0.5 + X[:,1]) * W
+            self._meta['T_distribution'] = 'Cox'
             return self._simulate_cox(linpred, 'weibull', {'lambda':1.0, 'k':0.5})
         # AFT scenario 1
         if s == 1:
             lp = -1.85 -0.8*(X[:,0]<0.5) +0.7*np.sqrt(X[:,1]) +0.2*X[:,2]
             lp += (0.7 -0.4*(X[:,0]<0.5) -0.4*np.sqrt(X[:,1])) * W
+            self._meta['T_distribution'] = 'AFT'
             return np.exp(lp + eps)
         # Poisson-based
         if s in (3,5,6,7,8):
             lam = X[:,1]**2 + X[:,2] + 6 + 2*(np.sqrt(X[:,0]) - 0.3) * W
             if s in [7,8]:
-                lam += 1 # TODO: why setting 7,8 have a different constant value added?
+                lam += 1
+            self._meta['T_distribution'] = 'Poisson'
             return np.random.poisson(lam)
             
         # Poisson variant 4
         if s == 4:
             lam = X[:,1] + X[:,2] + np.maximum(0, X[:,0] - 0.3) * W + 1e-3 # small constant added for stability
+            self._meta['T_distribution'] = 'Poisson'
             return np.random.poisson(lam)
         # AFT scenario 9
         if s == 9:
             lp = 0.3 -0.5*(X[:,0]<0.5) +0.5*np.sqrt(X[:,1]) +0.2*X[:,2]
             lp += (1 -0.8*(X[:,0]<0.5) -0.8*np.sqrt(X[:,1])) * W
+            self._meta['T_distribution'] = 'AFT'
             return np.exp(lp + eps)
         raise ValueError("Unsupported scenario for T")
 
@@ -189,7 +192,6 @@ class SyntheticDataGeneratorPlus:
                 if s == 6:
                     lam = 3 + np.log1p(np.exp(2*X[:,1] + X[:,2]))
                 elif s == 7: # unknown mechanism censoring
-                    # TODO: add dependent time to censoring and time to event with U
                     U = df[['U1','U2']].values
                     lam = 3 + 4*U[:,0] + 2*U[:,1]
                 else:
@@ -224,12 +226,16 @@ class SyntheticDataGeneratorPlus:
             df['observed_time'] = obs
             df['event'] = (T_f <= C).astype(int)
             df['id'] = np.arange(len(df))
-            df = df[['id', 'observed_time', 'event'] + [c for c in df.columns if c not in ['id', 'observed_time', 'event']]]
+            df = df[['id', 'observed_time', 'event', 'W'] + [c for c in df.columns if c not in ['id', 'observed_time', 'event', 'W']]]
             return df
         
-        df_train = build_df(self.n)
+        df = build_df(self.n)
 
-        return {'data':df_train, 
+        self._meta['treatment_proportion'] = df['W'].mean()
+        self._meta['censoring_rate'] = 1 - df['event'].mean()
+
+
+        return {'data':df, 
                 'metadata': self._meta}
 
 class SyntheticDataGenerator:
