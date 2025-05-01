@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from sklearn.metrics import mean_squared_error
 from sklearn.linear_model import LogisticRegression
 import numpy as np
-from regressor_base import RegressorBaseLearner
+from .regressor_base import RegressorBaseLearner
 
 class BaseMetaLearner(ABC):
     """
