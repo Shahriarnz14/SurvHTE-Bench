@@ -2,6 +2,7 @@ import rpy2.robjects as ro
 from rpy2.robjects import r, numpy2ri, FloatVector
 from rpy2.robjects.packages import importr, PackageNotInstalledError
 import numpy as np
+from sklearn.metrics import mean_squared_error
 
 class CausalSurvivalForestGRF:
     def __init__(self, failure_times_grid_size=100, horizon=None, target="RMST"):
@@ -67,15 +68,32 @@ class CausalSurvivalForestGRF:
             horizon=self.horizon
         )
 
-    def predict_cate(self, X_test, W_test=None):
+    def predict_cate(self, X, W=None):
         """
         Predicts the CATE using the fitted model.
-        :param X_test: np.array of shape (n, p)
-        :param W_test: np.array of shape (n, 1) with the treatment assignment (Not used in CSF)
+        :param X: np.array of shape (n, p)
+        :param W: np.array of shape (n, 1) with the treatment assignment (Not used in CSF)
         :return: np.array of shape (n, 1) with the predicted CATE
         """
         if self.model is None:
             raise RuntimeError("You must call `fit` before `predict`.")
-        X_test_r = self._to_r_matrix(X_test)
+        X_test_r = self._to_r_matrix(X)
         prediction_r = self.stats.predict(self.model, X_test_r)
         return np.array(prediction_r.rx2("predictions"))
+
+    def evaluate(self, X, cate_true, W=None):
+        """
+        Evaluate CATE predictions using mean squared error.
+        
+        Parameters:
+        - X (np.ndarray): Test features.
+        - cate_true (np.ndarray): Ground-truth CATE values (from simulation).
+        - W (np.ndarray): Treatment assignment (not used in this method).
+        
+        Returns:
+        - mse (float): Mean squared error.
+        - cate_pred (np.ndarray): Predicted CATE values.
+        """
+        cate_pred = self.predict_cate(X)
+        mse = mean_squared_error(cate_true, cate_pred)
+        return mse, cate_pred
