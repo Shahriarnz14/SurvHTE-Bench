@@ -189,13 +189,15 @@ class SyntheticDataGeneratorPlus:
                 return np.where(u < 0.6, np.inf, 1 + (X[:,3] < 0.5).astype(int))
             # Poisson 6,7,8
             if s in (6,7,8):
-                if s == 6:
-                    lam = 3 + np.log1p(np.exp(2*X[:,1] + X[:,2]))
+                if s == 6: # switching 8 and 6 of the original
+                    # lam = 3 + np.log1p(np.exp(2*X[:,1] + X[:,2]))
+                    lam = 3
                 elif s == 7: # unknown mechanism censoring
                     U = df[['U1','U2']].values
                     lam = 3 + 4*U[:,0] + 2*U[:,1]
-                else:
-                    lam = 3
+                else: # switching 8 and 6 of the original
+                    # lam = 3
+                    lam = 3 + np.log1p(np.exp(2*X[:,1] + X[:,2]))
                 return np.random.poisson(lam, size=len(df))
             # interval-censor 10
             if s == 10:
