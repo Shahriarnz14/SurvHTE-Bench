@@ -125,21 +125,28 @@ class SyntheticDataGeneratorPlus:
         W = df['W'].values
         s = self.scenario
         eps = np.random.normal(size=len(df)) # TODO: why some with eps, some without?
+
+        U = df[['U1', 'U2']].values
+        U_counfounder = U[:, 0] if self.unobserved else np.zeros(len(U))
+
         # Cox-based T for scenarios 2 & 10
         if s in (2, 10):
             # linpred = X1 + (-0.5+X2)*W
             linpred = X[:,0] + (-0.5 + X[:,1]) * W
+            linpred +=  0.5 * U_counfounder
             self._meta['T_distribution'] = 'Cox'
             return self._simulate_cox(linpred, 'weibull', {'lambda':1.0, 'k':0.5})
         # AFT scenario 1
         if s == 1:
             lp = -1.85 -0.8*(X[:,0]<0.5) +0.7*np.sqrt(X[:,1]) +0.2*X[:,2]
             lp += (0.7 -0.4*(X[:,0]<0.5) -0.4*np.sqrt(X[:,1])) * W
+            lp += 0.5 * U_counfounder
             self._meta['T_distribution'] = 'AFT'
             return np.exp(lp + eps)
         # Poisson-based
         if s in (3,5,6,7,8):
             lam = X[:,1]**2 + X[:,2] + 6 + 2*(np.sqrt(X[:,0]) - 0.3) * W
+            lam += 0.5 * U_counfounder
             if s in [7,8]:
                 lam += 1
             self._meta['T_distribution'] = 'Poisson'
@@ -148,12 +155,14 @@ class SyntheticDataGeneratorPlus:
         # Poisson variant 4
         if s == 4:
             lam = X[:,1] + X[:,2] + np.maximum(0, X[:,0] - 0.3) * W + 1e-3 # small constant added for stability
+            lam += 0.5 * U_counfounder
             self._meta['T_distribution'] = 'Poisson'
             return np.random.poisson(lam)
         # AFT scenario 9
         if s == 9:
             lp = 0.3 -0.5*(X[:,0]<0.5) +0.5*np.sqrt(X[:,1]) +0.2*X[:,2]
             lp += (1 -0.8*(X[:,0]<0.5) -0.8*np.sqrt(X[:,1])) * W
+            lp += 0.5 * U_counfounder
             self._meta['T_distribution'] = 'AFT'
             return np.exp(lp + eps)
         raise ValueError("Unsupported scenario for T")
