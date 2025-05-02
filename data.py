@@ -16,7 +16,7 @@ class SyntheticDataGeneratorPlus:
     """
     def __init__(self, scenario=1, n_samples=5000, n_features=5,
                  random_state=None, dataset_name=None, 
-                 RCT=True, treatment_proportion=0.5, unobserved=False,
+                 RCT=True, treatment_proportion=0.5, unobserved=False, overlap=True,
                  informative_censoring=False, info_censor_baseline=1.0, info_censor_alpha=0.1):
         '''
         unobserved: bool
@@ -40,6 +40,7 @@ class SyntheticDataGeneratorPlus:
         self.dataset_name = dataset_name or f"scenario_{scenario}"
         self.rct = RCT
         self.treatment_proportion = treatment_proportion # only used if RCT=True
+        self.overlap = overlap # only used if RCT=False, overlap assumption holding
         self.unobserved = unobserved
         self.informative_censoring = informative_censoring
         self.info_censor_baseline = info_censor_baseline
@@ -52,6 +53,7 @@ class SyntheticDataGeneratorPlus:
             'n_features': self.p,
             'RCT': self.rct,
             'unobserved': self.unobserved,
+            'overlap': self.overlap,
             'informative_censoring': self.informative_censoring,
             'random_state': self.random_state,
         }
@@ -94,10 +96,15 @@ class SyntheticDataGeneratorPlus:
         else:
             X = df[[c for c in df.columns if c.startswith('X')]].values
             if not self.unobserved:
-                # e(X) via Beta PDF on X[:,0]
-                pdf_vals = beta.pdf(X[:, 0], 2, 4)
-                e = (1 + pdf_vals) / 4 # propensity score e(X)
-                self._meta['propensity_type'] = 'e(X)'
+                if self.overlap:
+                    # e(X) via Beta PDF on X[:,0]
+                    pdf_vals = beta.pdf(X[:, 0], 2, 4)
+                    e = (1 + pdf_vals) / 4 # propensity score e(X)
+                    self._meta['propensity_type'] = 'e(X)'
+                else:
+                    # overlap assumption not holding:
+                    e = np.where(X[:, 0] > 0.8, 1, np.where(X[:, 0] < 0.2, 0, 0.5))
+                    self._meta['propensity_type'] = 'e(X)_no_overlap'
             else:
                 # Unobserved confounders: e(X,U) via Beta PDF on (0.3*X[:,0] + 0.7*U1)
                 U = df[['U1', 'U2']].values
