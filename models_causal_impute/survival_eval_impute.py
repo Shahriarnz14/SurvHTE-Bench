@@ -256,6 +256,25 @@ class SurvivalEvalImputer:
 
         # Only impute censored points
         censored_indices = np.where(~event_indicators)[0]
+
+        if len(censored_indices) == 0:
+            return best_guesses
+        elif len(censored_indices) == 1:
+            km_train_idx = np.setdiff1d(np.arange(n), censored_indices)
+            km_model = KaplanMeierArea(event_times[km_train_idx], event_indicators[km_train_idx])
+
+            km_linear_zero = max_horizon_time
+            val_censor_times = event_times[censored_indices]
+
+            imputed_val = km_model.best_guess(val_censor_times)
+            imputed_val[val_censor_times > km_linear_zero] = val_censor_times[val_censor_times > km_linear_zero]
+            
+            best_guesses[censored_indices] = imputed_val
+            return best_guesses
+
+
+        if len(censored_indices) < num_folds:
+            num_folds = len(censored_indices)
         kf = KFold(n_splits=num_folds, shuffle=True, random_state=42)
 
         # Split only censored indices
@@ -263,7 +282,7 @@ class SurvivalEvalImputer:
             censored_train_idx = censored_indices[train_index]
             censored_val_idx = censored_indices[val_index]
             
-            # Build KM on full training data excluding the censored test fold
+            # Build KM on full training data excluding the censored validation fold
             km_train_idx = np.setdiff1d(np.arange(n), censored_val_idx)
             km_model = KaplanMeierArea(event_times[km_train_idx], event_indicators[km_train_idx])
             
@@ -375,7 +394,11 @@ class SurvivalEvalImputer:
                     best_guesses[i] = km_linear_zero
                 else:
                     best_guesses[i] = np.mean(train_event_times[train_event_indicators == 1][afterward_event_idx])
-                
+
+                if best_guesses[i] < train_event_times[i]:
+                    best_guesses[i] = train_event_times[i]
+                    warnings.warn(f"[Train Imputes] Best guess for training sample {i} is less than the observed time. Setting it to the observed time.")
+                                    
         # NaN values are generated because there are no events after the censor times
         nan_idx = np.argwhere(np.isnan(best_guesses))
         best_guesses = np.delete(best_guesses, nan_idx)
@@ -435,6 +458,10 @@ class SurvivalEvalImputer:
                     best_guesses[i] = km_linear_zero
                 else:
                     best_guesses[i] = np.mean(train_event_times[train_event_indicators == 1][afterward_event_idx])
+
+                if best_guesses[i] < test_event_times[i]:
+                    best_guesses[i] = test_event_times[i]
+                    warnings.warn(f"[Testing Imputes] Best guess for test sample {i} is less than the observed time. Setting it to the observed time.")
                 
         # NaN values are generated because there are no events after the censor times
         nan_idx = np.argwhere(np.isnan(best_guesses))
