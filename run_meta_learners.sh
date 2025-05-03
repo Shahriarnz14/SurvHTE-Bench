@@ -13,7 +13,7 @@ IMPUTE_METHODS=("Pseudo_obs" "Margin" "IPCW-T")
 # Loop through each method and run the Python script
 for METHOD in "${IMPUTE_METHODS[@]}"
 do
-    echo "Running $META_LEARNERwith imputation method: $METHOD"
+    echo "Running $META_LEARNER with imputation method: $METHOD"
     python run_meta_learner_imput.py \
         --num_repeats $REPEATS \
         --train_size $TRAIN_SIZE \
