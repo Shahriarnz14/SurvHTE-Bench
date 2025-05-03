@@ -14,7 +14,7 @@ IMPUTE_METHODS=("Pseudo_obs" "Margin" "IPCW-T")
 for METHOD in "${IMPUTE_METHODS[@]}"
 do
     echo "Running $META_LEARNER with imputation method: $METHOD"
-    python run_meta_learner_imput.py \
+    python run_meta_learner_impute.py \
         --num_repeats $REPEATS \
         --train_size $TRAIN_SIZE \
         --test_size $TEST_SIZE \
