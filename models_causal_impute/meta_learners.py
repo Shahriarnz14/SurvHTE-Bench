@@ -50,8 +50,9 @@ class BaseMetaLearner(ABC):
         - cate_pred (np.ndarray): Predicted CATE values.
         """
         cate_pred = self.predict_cate(X)
+        ate_pred = np.mean(cate_pred)
         mse = mean_squared_error(cate_true, cate_pred)
-        return mse, cate_pred
+        return mse, cate_pred, ate_pred
 
 
 class TLearner(BaseMetaLearner):
