@@ -185,7 +185,7 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--num_repeats", type=int, default=10)
-    parser.add_argument("--train_size", type=str, default='all')
+    parser.add_argument("--train_size", type=str, default='all') # correspoonding to use half of the dataset as training
     parser.add_argument("--impute_method", type=str, default="Pseudo_obs", choices=["Pseudo_obs", "Margin", "IPCW-T"])
     parser.add_argument("--meta_learner", type=str, default="t_learner", choices=["t_learner", "s_learner", "x_learner"])
     parser.add_argument("--load_imputed", action="store_true")
