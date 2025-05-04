@@ -5,7 +5,7 @@ and saves the processed data for three different treatment groups (HIV1, HIV2, a
 The script performs the following steps:
 1. Fetch the ACTG 175 dataset from the UCI Machine Learning Repository.
 2. Process the dataset to change the resolution from days to months.
-3. Apply the effective non-censoring assumption to the dataset.
+3. Apply the effective non-censoring assumption to the dataset (it will result in the same effect as setting the `horizon` parameter in running CSF).
 4. Add censoring to the dataset based on a Bernoulli distribution.
 5. For each treatment group (HIV1, HIV2, and HIV3), run the Causal Survival Forest model 10 times,
     and take the average of the estimated conditional average treatment effect (CATE) as the base CATE.
