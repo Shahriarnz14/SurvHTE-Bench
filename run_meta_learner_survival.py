@@ -6,6 +6,8 @@ import pickle
 import time
 from tqdm import tqdm
 from models_causal_survival_meta.meta_learners_survival import TLearnerSurvival, SLearnerSurvival, MatchingLearnerSurvival
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
 
 def load_scenario_data(h5_file_path, scenario_num):
     """Load data for a specific scenario from HDF5 file."""
