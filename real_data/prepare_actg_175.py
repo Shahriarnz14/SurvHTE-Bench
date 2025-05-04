@@ -100,7 +100,7 @@ hiv1['cate_base'] = cate_base
 hiv1.to_csv('ACTG_175_HIV1.csv', index=False)
 
 ## HIV 2: ZDV(0) vs ZDV + Zal(2)
-hiv2 = data[data.trt.isin([0,1])][columns].copy()
+hiv2 = data[data.trt.isin([0,2])][columns].copy()
 hiv2['id'] = range(1, len(hiv2) + 1)
 hiv2 = hiv2[['id'] + columns]
 hiv2['trt'] = hiv2['trt'].apply(lambda x: 0 if x == 0 else 1)
@@ -118,7 +118,7 @@ hiv2['cate_base'] = cate_base
 hiv2.to_csv('ACTG_175_HIV2.csv', index=False)
 
 ## HIV 2: ZDV(0) vs ddI(3)
-hiv3 = data[data.trt.isin([0,1])][columns].copy()
+hiv3 = data[data.trt.isin([0,3])][columns].copy()
 hiv3['id'] = range(1, len(hiv3) + 1)
 hiv3 = hiv3[['id'] + columns]
 hiv3['trt'] = hiv3['trt'].apply(lambda x: 0 if x == 0 else 1)
