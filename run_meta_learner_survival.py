@@ -167,7 +167,6 @@ def main(args):
                 "std_ate_true": np.std([avg[i]["ate_true"] for i in random_idx_col_list]),
                 "mean_ate_bias": np.mean([avg[i]["ate_bias"] for i in random_idx_col_list]),
                 "std_ate_bias": np.std([avg[i]["ate_bias"] for i in random_idx_col_list]),
-                "mean_base_model_eval": np.mean([avg[i]["base_model_eval"] for i in random_idx_col_list]),
                 "runtime": (end_time - start_time) / len(random_idx_col_list),
                 "base_model_eval" : {
                         base_model_k: {
