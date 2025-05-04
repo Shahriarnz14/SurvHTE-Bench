@@ -37,7 +37,7 @@ def insert_censoring(row, seed=2025):
     else:
         return row['observed_time_month'], row['effect_non_censor']
     
-# fetch dataset 
+# fetch dataset https://archive.ics.uci.edu/dataset/890/aids+clinical+trials+group+study+175
 aids_clinical_trials_group_study_175 = fetch_ucirepo(id=890) 
   
 # data (as pandas dataframes) 
@@ -92,7 +92,7 @@ Y = hiv1[y_cols].values
 cate_hat = np.zeros((X.shape[0], 10))
 # run csf for 10 times, take the average cate --> base cate
 for i in range(10):
-    csf = CausalSurvivalForestGRF(failure_times_grid_size=failure_times_grid_size, horizon=30, seed=i)
+    csf = CausalSurvivalForestGRF(failure_times_grid_size=failure_times_grid_size, horizon=30, min_node_size=18, seed=i)
     csf.fit(X, W, Y)
     cate_hat[:, i] = csf.predict_cate(X)
 cate_base = cate_hat.mean(axis=1) # used as true cate for comparison with est. cate after adding censoring
@@ -110,7 +110,7 @@ Y = hiv2[y_cols].values
 cate_hat = np.zeros((X.shape[0], 10))
 # run csf for 10 times, take the average cate --> base cate
 for i in range(10):
-    csf = CausalSurvivalForestGRF(failure_times_grid_size=failure_times_grid_size, horizon=30, seed=i)
+    csf = CausalSurvivalForestGRF(failure_times_grid_size=failure_times_grid_size, horizon=30, min_node_size=18, seed=i)
     csf.fit(X, W, Y)
     cate_hat[:, i] = csf.predict_cate(X)
 cate_base = cate_hat.mean(axis=1) # used as true cate for comparison with est. cate after adding censoring
@@ -128,7 +128,7 @@ Y = hiv3[y_cols].values
 cate_hat = np.zeros((X.shape[0], 10))
 # run csf for 10 times, take the average cate --> base cate
 for i in range(10):
-    csf = CausalSurvivalForestGRF(failure_times_grid_size=failure_times_grid_size, horizon=30, seed=i)
+    csf = CausalSurvivalForestGRF(failure_times_grid_size=failure_times_grid_size, horizon=30, min_node_size=18, seed=i)
     csf.fit(X, W, Y)
     cate_hat[:, i] = csf.predict_cate(X)
 cate_base = cate_hat.mean(axis=1) # used as true cate for comparison with est. cate after adding censoring
