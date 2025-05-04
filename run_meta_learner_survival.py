@@ -5,7 +5,7 @@ import numpy as np
 import pickle
 import time
 from tqdm import tqdm
-from models_causal_survival.meta_learners_survival import TLearnerSurvival, SLearnerSurvival, MatchingLearnerSurvival
+from models_causal_survival_meta.meta_learners_survival import TLearnerSurvival, SLearnerSurvival, MatchingLearnerSurvival
 
 def load_scenario_data(h5_file_path, scenario_num):
     """Load data for a specific scenario from HDF5 file."""
