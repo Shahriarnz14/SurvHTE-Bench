@@ -23,7 +23,7 @@ def get_concordance_score(Y_test, surv, times):
 
 def get_integrated_brier_score(survival_train, survival_test, surv, times):
     if survival_train is None:
-        Warning("Survival train data not available. Cannot compute integrated Brier score (IBS)")
+        print("[Warning]: Survival train data not available. Cannot compute integrated Brier score (IBS)")
         return None
     
     _, train_time = check_y_survival(survival_train)
@@ -54,7 +54,7 @@ def get_integrated_brier_score(survival_train, survival_test, surv, times):
 
 def get_cumulative_dynamic_auc(survival_train, survival_test, surv, times):
     if survival_train is None:
-        Warning("Survival train data not available. Cannot compute Time-Dependent AUC (td-AUC)")
+        print("Survival train data not available. Cannot compute Time-Dependent AUC (td-AUC)")
         return None
     
     # Need to pass the cumulative hazard function to compute the Time-Dependent AUC
@@ -208,7 +208,7 @@ class CensoringDistributionEstimator(SurvivalFunctionEstimator):
         Ghat[Ghat == 0.0] += 1e-6
 
         if (Ghat == 0.0).any():
-            Warning("censoring survival function is zero at one or more time points")
+            print("[Warning]: censoring survival function is zero at one or more time points")
 
         weights = np.zeros(time.shape[0])
         weights[event] = 1.0 / Ghat

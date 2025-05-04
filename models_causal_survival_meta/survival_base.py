@@ -73,10 +73,49 @@ class SurvivalModelBase:
         torch.manual_seed(self.random_seed)
         torch.cuda.manual_seed(self.random_seed)
 
-        # Split into train and validation sets for model selection
-        X_train_fit, X_val, Y_train_fit, Y_val = train_test_split(
-            X_train, Y_train, test_size=0.2, random_state=self.random_seed
-        )
+        try:
+            # Split into train and validation sets for model selection
+            X_train_fit, X_val, Y_train_fit, Y_val = train_test_split(
+                X_train, Y_train, test_size=0.2, random_state=self.random_seed,
+                stratify=Y_train[:, 1]
+            )
+        except ValueError:
+            # If stratified split fails, we only have one event type (event/censored) in Y_train
+            X_train_fit = X_train
+            Y_train_fit = Y_train
+            X_val = X_train
+            Y_val = Y_train
+            print("[Warning]: Stratified split for validation failed. Using full training data for fitting.")
+
+        if len(Y_val) == 1:
+            # If validation set has only one sample, we use training data for validation
+            X_val = X_train_fit
+            Y_val = Y_train_fit
+            print("[Warning]: Validation set had only one sample. Using training data for validation.")
+
+        # Checking that validation set has at least one event
+        if not np.any(Y_val[:, 1] == 1):
+            # Find index of a class-1 sample in the training set
+            idx_in_train = np.where(Y_train_fit[:, 1] == 1)[0]
+
+            if idx_in_train.size > 0:
+                # Take the first such index (or random if preferred)
+                idx_to_duplicate = idx_in_train[0]
+
+                # Get the example
+                x_dup = X_train_fit[idx_to_duplicate]
+                y_dup = Y_train_fit[idx_to_duplicate]
+
+                # Duplicate it into validation set
+                X_val = np.concatenate([X_val, x_dup[None, :]], axis=0)
+                Y_val = np.concatenate([Y_val, y_dup[None, :]], axis=0)
+                # Shuffle the validation set
+                perm = np.random.permutation(X_val.shape[0])
+                X_val = X_val[perm]
+                Y_val = Y_val[perm]
+                print("[Warning]: All validation was censored. Duplicating single event example into validation set.")
+            else:
+                print("[Warning]: All train is censored. No event example available to duplicate into validation set.")
 
         self.survival_train = self._prepare_sksurv_data(Y_train)
 
@@ -242,8 +281,14 @@ class SurvivalModelBase:
                         val_data = (X_val.astype(np.float32), 
                                 (Y_val[:, 0].astype(np.float32), Y_val[:, 1].astype(int)))
                         
-                        
                         batch_size = 64
+                        if X_train.shape[0] % batch_size == 1:
+                            if X_train.shape[0] % (batch_size + 1) != 1:
+                                batch_size += 1
+                            elif X_train.shape[0] % (batch_size - 1) != 1:
+                                batch_size -= 1
+                            else:
+                                batch_size = batch_size // 2
                         
                         model.fit(
                             *train_data,
@@ -252,7 +297,7 @@ class SurvivalModelBase:
                             callbacks=[tt.callbacks.EarlyStopping()],
                             verbose=False,
                             val_data=val_data,
-                            val_batch_size=batch_size
+                            val_batch_size=512
                         )
                         
                         # Compute baseline hazards required for prediction
@@ -263,7 +308,12 @@ class SurvivalModelBase:
                         times = surv_curves.index.to_numpy()
                         
                         # Calculate concordance index
-                        concordance_td = get_concordance_score(Y_val, surv_curves, times)
+                        try:
+                            concordance_td = get_concordance_score(Y_val, surv_curves, times)
+                        # catch zero division error
+                        except ZeroDivisionError as e: # Could Happen if no comparable pairs for small training size
+                            print(f"[Warning]: No comparable pairs for validation set (training continues): {str(e)}")
+                            concordance_td = 0
                         
                         if concordance_td > best_concordance:
                             best_concordance = concordance_td
@@ -298,7 +348,11 @@ class SurvivalModelBase:
         
         # Transform the data
         Y_train_fit = labtrans.fit_transform(Y_train[:, 0].astype(np.float32), Y_train[:, 1].astype(int))
-        Y_val_fit = labtrans.transform(Y_val[:, 0].astype(np.float32), Y_val[:, 1].astype(int))
+        try:
+            Y_val_fit = labtrans.transform(Y_val[:, 0].astype(np.float32), Y_val[:, 1].astype(int))
+        except ValueError:
+            Y_val_fit = labtrans.transform(np.vstack((Y_val, Y_train))[:, 0].astype(np.float32), np.vstack((Y_val, Y_train))[:, 1].astype(int))
+            Y_val_fit = (Y_val_fit[0][:Y_val.shape[0]], Y_val_fit[1][:Y_val.shape[0]])
         
         # Grid search
         for num_nodes in param_grid.get('num_nodes', [128]):
@@ -317,17 +371,26 @@ class SurvivalModelBase:
                             net, tt.optim.Adam, alpha=0.2, sigma=0.1, duration_index=labtrans.cuts
                         )
                         model.optimizer.set_lr(lr)
+
+                        batch_size = 64
+                        if X_train.shape[0] % batch_size == 1:
+                            if X_train.shape[0] % (batch_size + 1) != 1:
+                                batch_size += 1
+                            elif X_train.shape[0] % (batch_size - 1) != 1:
+                                batch_size -= 1
+                            else:
+                                batch_size = batch_size // 2
                         
                         # Train model
                         model.fit(
                             X_train.astype(np.float32),
                             Y_train_fit,
-                            batch_size=64,
+                            batch_size=batch_size,
                             epochs=epochs,
                             callbacks=[tt.callbacks.EarlyStopping()],
                             verbose=False,
                             val_data=(X_val.astype(np.float32), Y_val_fit),
-                            val_batch_size=64
+                            val_batch_size=512
                         )
                         
                         # Get survival curves for validation set
@@ -336,7 +399,12 @@ class SurvivalModelBase:
                         times = surv_curves.index.to_numpy()
                         
                         # Calculate concordance index
-                        concordance_td = get_concordance_score(Y_val, surv_curves, times)
+                        try:
+                            concordance_td = get_concordance_score(Y_val, surv_curves, times)
+                        # catch zero division error
+                        except ZeroDivisionError as e: # Could Happen if no comparable pairs for small training size
+                            print(f"[Warning]: No comparable pairs for validation set (training continues): {str(e)}")
+                            concordance_td = 0
                         
                         if concordance_td > best_concordance:
                             best_concordance = concordance_td
@@ -374,14 +442,14 @@ class SurvivalModelBase:
         try:
             concordance_td = get_concordance_score(Y_test, surv, times)
         except Exception as e:
-            print(f"Error calculating concordance score: {str(e)}")
+            print(f"[Warning]: Error calculating concordance_td for the current random-seed. (Base-learner result of this repeat will be excluded): {str(e)}")
             concordance_td = np.nan
             
         # Calculate integrated brier score with exception handling
         try:
             ibs = get_integrated_brier_score(self.survival_train, self.survival_test, surv, times)
         except Exception as e:
-            print(f"Error calculating integrated brier score: {str(e)}")
+            print(f"[Warning]: Error calculating integrated brier score for the current random-seed. (Base-learner result of this repeat will be excluded): {str(e)}")
             ibs = np.nan
             
         # # Calculate time-dependent AUC with exception handling

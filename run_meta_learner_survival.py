@@ -137,6 +137,14 @@ def main(args):
                         max_time=max_time
                     )
 
+                if args.meta_learner == "t_learner_survival":
+                    if Y_train[W_train == 1, 1].sum() <= 1:
+                        print(f"[Warning]: For {args.meta_learner}, No event in treatment group. Skipping iteration {rand_idx}.")
+                        continue
+                    if Y_train[W_train == 0, 1].sum() <= 1:
+                        print(f"[Warning]: For {args.meta_learner}, No event in control group. Skipping iteration {rand_idx}.")
+                        continue
+
                 # Fit the learner
                 learner.fit(X_train, W_train, Y_train)
                 
@@ -158,27 +166,34 @@ def main(args):
 
             end_time = time.time()
             avg = results_dict[setup_name][scenario_key]
+            if len(avg) == 0:
+                base_model_eval_performance = {}
+            else:
+                base_model_eval_performance = {
+                                                base_model_k: 
+                                                {
+                                                    f"{stat}_{metric_j}": func([
+                                                        avg[i]['base_model_eval'][base_model_k][metric_j] for i in random_idx_col_list
+                                                        if i in avg
+                                                    ])
+                                                    for metric_j in metric_j_dict
+                                                    for stat, func in zip(['mean', 'std'], [np.nanmean, np.nanstd])
+                                                }
+                                                for base_model_k, metric_j_dict in avg[list(avg.keys())[0]]['base_model_eval'].items()
+                                            }
+
             results_dict[setup_name][scenario_key]["average"] = {
-                "mean_cate_mse": np.mean([avg[i]["cate_mse"] for i in random_idx_col_list]),
-                "std_cate_mse": np.std([avg[i]["cate_mse"] for i in random_idx_col_list]),
-                "mean_ate_pred": np.mean([avg[i]["ate_pred"] for i in random_idx_col_list]),
-                "std_ate_pred": np.std([avg[i]["ate_pred"] for i in random_idx_col_list]),
-                "mean_ate_true": np.mean([avg[i]["ate_true"] for i in random_idx_col_list]),
-                "std_ate_true": np.std([avg[i]["ate_true"] for i in random_idx_col_list]),
-                "mean_ate_bias": np.mean([avg[i]["ate_bias"] for i in random_idx_col_list]),
-                "std_ate_bias": np.std([avg[i]["ate_bias"] for i in random_idx_col_list]),
-                "runtime": (end_time - start_time) / len(random_idx_col_list),
-                "base_model_eval" : {
-                        base_model_k: {
-                            f"{stat}_{metric_j}": func([
-                                avg[i]['base_model_eval'][base_model_k][metric_j] for i in random_idx_col_list
-                            ])
-                            for metric_j in metric_j_dict
-                            for stat, func in zip(['mean', 'std'], [np.nanmean, np.nanstd])
-                        }
-                        for base_model_k, metric_j_dict in avg[random_idx_col_list[0]]['base_model_eval'].items()
-                    }
-            }
+                "mean_cate_mse": np.mean([avg[i]["cate_mse"] for i in random_idx_col_list if i in avg]),
+                "std_cate_mse": np.std([avg[i]["cate_mse"] for i in random_idx_col_list if i in avg]),
+                "mean_ate_pred": np.mean([avg[i]["ate_pred"] for i in random_idx_col_list if i in avg]),
+                "std_ate_pred": np.std([avg[i]["ate_pred"] for i in random_idx_col_list if i in avg]),
+                "mean_ate_true": np.mean([avg[i]["ate_true"] for i in random_idx_col_list if i in avg]),
+                "std_ate_true": np.std([avg[i]["ate_true"] for i in random_idx_col_list if i in avg]),
+                "mean_ate_bias": np.mean([avg[i]["ate_bias"] for i in random_idx_col_list if i in avg]),
+                "std_ate_bias": np.std([avg[i]["ate_bias"] for i in random_idx_col_list if i in avg]),
+                "runtime": (end_time - start_time) / len(avg) if len(avg) > 0 else 0,
+                "base_model_eval" : base_model_eval_performance
+                }
 
             with open(output_pickle_path, "wb") as f:
                 pickle.dump(results_dict, f)
