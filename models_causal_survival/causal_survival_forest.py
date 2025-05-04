@@ -5,7 +5,7 @@ import numpy as np
 from sklearn.metrics import mean_squared_error
 
 class CausalSurvivalForestGRF:
-    def __init__(self, failure_times_grid_size=100, horizon=None, target="RMST"):
+    def __init__(self, failure_times_grid_size=100, horizon=None, target="RMST", seed=None):
         """
         Causal Survival Forest using the grf package in R.
         :param failure_times_grid_size: Number of points in the grid for failure times.
@@ -16,6 +16,7 @@ class CausalSurvivalForestGRF:
         self.model = None
         self.horizon = horizon # if not provided, will be set to the maximum event time in the training data
         self.target = target
+        self.seed = seed
 
         # Activate numpy <-> R automatic conversion
         numpy2ri.activate()
@@ -58,15 +59,27 @@ class CausalSurvivalForestGRF:
         failure_times_grid = self._make_failure_time_grid(Y_time)
         failure_times_r = self._to_r_float_vector(failure_times_grid)
 
-        self.model = self.grf.causal_survival_forest(
-            X_train_r,
-            Y_time_r,
-            W_train_r,
-            Y_event_r,
-            target=self.target,
-            failure_times=failure_times_r,
-            horizon=self.horizon
-        )
+        if self.seed is None:
+            self.model = self.grf.causal_survival_forest(
+                X_train_r,
+                Y_time_r,
+                W_train_r,
+                Y_event_r,
+                target=self.target,
+                failure_times=failure_times_r,
+                horizon=self.horizon
+            )
+        else:
+            self.model = self.grf.causal_survival_forest(
+                X_train_r,
+                Y_time_r,
+                W_train_r,
+                Y_event_r,
+                target=self.target,
+                failure_times=failure_times_r,
+                horizon=self.horizon,
+                seed=self.seed
+            )
 
     def predict_cate(self, X, W=None):
         """
