@@ -17,8 +17,8 @@ def prepare_actg_data_split(dataset_df, X_cols, W_col, cate_base_col, experiment
     for rand_idx in range(NUM_REPEATS_TO_INCLUDE):
         y_cols = [f't{rand_idx}', f'e{rand_idx}']
         # take the first half of the dataset for training and the second half for testing
-        train_ids = experiment_repeat_setup[f'random_idx{rand_idx}'][:length//2].values
-        test_ids =  experiment_repeat_setup[f'random_idx{rand_idx}'][length//2:].values
+        train_ids = experiment_repeat_setup[f'random_idx{rand_idx}'][:int(length*args.train_size)].values
+        test_ids =  experiment_repeat_setup[f'random_idx{rand_idx}'][int(length*args.train_size):].values
         # test_ids = dataset_df['id'] # same as train_ids
         # train_ids = dataset_df['id']
         
@@ -131,7 +131,7 @@ def main(args):
                     if args.load_imputed:
                         with open(args.imputed_path, "rb") as f:
                             imputed_times = pickle.load(f)
-                        imputed_results = imputed_times.get(args.impute_method, {}).get(setup_name, {}).get(scenario_key, {}).get(args.train_size, {}).get(rand_idx, {})
+                        imputed_results = imputed_times.get(args.impute_method, {}).get(setup_name, {}).get(scenario_key, {}).get(f'{str(int(args.train_size*100))}%', {}).get(rand_idx, {})
                         Y_train_imputed = imputed_results.get("Y_train_imputed", None)
                         Y_test_imputed = imputed_results.get("Y_test_imputed", None)
                     else:
@@ -185,7 +185,7 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--num_repeats", type=int, default=10)
-    parser.add_argument("--train_size", type=str, default='all') # correspoonding to use half of the dataset as training
+    parser.add_argument("--train_size", type=float, default='0.75')
     parser.add_argument("--impute_method", type=str, default="Pseudo_obs", choices=["Pseudo_obs", "Margin", "IPCW-T"])
     parser.add_argument("--meta_learner", type=str, default="t_learner", choices=["t_learner", "s_learner", "x_learner"])
     parser.add_argument("--load_imputed", action="store_true")
