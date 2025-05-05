@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from sklearn.metrics import mean_squared_error
 from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import roc_auc_score, f1_score
 import numpy as np
 from .regressor_base import RegressorBaseLearner
 
@@ -26,6 +27,20 @@ class BaseMetaLearner(ABC):
     def fit(self, X_train, W_train, Y_train):
         """
         Fit the meta-learner on training data.
+        """
+        pass
+
+    @abstractmethod
+    def evaluate_test(self, X_test, Y_test, W_test):
+        """
+        Evaluate base models on test data.
+        
+        Parameters:
+        - X_test (np.ndarray): Test features
+        - Y_test (np.ndarray): Test targets
+        
+        Returns:
+        - dict: Evaluation metrics for each base model
         """
         pass
 
@@ -71,6 +86,30 @@ class TLearner(BaseMetaLearner):
         mu1 = self.models['treated'].predict(X)
         mu0 = self.models['control'].predict(X)
         return mu1 - mu0
+    
+    def evaluate_test(self, X_test, Y_test, W_test):
+        """
+        Evaluate base models on test data.
+        
+        Parameters:
+        - X_test (np.ndarray): Test features
+        - Y_test (np.ndarray): Test targets
+        - W_test (np.ndarray): Treatment indicators
+        
+        Returns:
+        - dict: Evaluation metrics for each base model
+        """
+        self.evaluation_test_dict = {}
+        
+        # Evaluate treated model
+        treated_eval = self.models['treated'].evaluate(X_test[W_test == 1], Y_test[W_test == 1])
+        self.evaluation_test_dict['treated'] = treated_eval
+        
+        # Evaluate control model
+        control_eval = self.models['control'].evaluate(X_test[W_test == 0], Y_test[W_test == 0])
+        self.evaluation_test_dict['control'] = control_eval
+        
+        return self.evaluation_test_dict
 
 
 class SLearner(BaseMetaLearner):
@@ -89,6 +128,29 @@ class SLearner(BaseMetaLearner):
         mu0 = self.models['s'].predict(X0)
         mu1 = self.models['s'].predict(X1)
         return mu1 - mu0
+    
+    def evaluate_test(self, X_test, Y_test, W_test):
+        """
+        Evaluate base model on test data.
+        
+        Parameters:
+        - X_test (np.ndarray): Test features
+        - Y_test (np.ndarray): Test targets
+        - W_test (np.ndarray): Treatment indicators
+        
+        Returns:
+        - dict: Evaluation metrics for the base model
+        """
+        self.evaluation_test_dict = {}
+        
+        # Augment features with treatment indicator
+        X_aug = np.column_stack((X_test, W_test))
+        
+        # Evaluate model
+        model_eval = self.models['s'].evaluate(X_aug, Y_test)
+        self.evaluation_test_dict['s'] = model_eval
+        
+        return self.evaluation_test_dict
 
 
 class XLearner(BaseMetaLearner):
@@ -120,3 +182,58 @@ class XLearner(BaseMetaLearner):
         tau1 = self.models['tau1'].predict(X)
         p = self.models['propensity'].predict_proba(X)[:, 1]
         return p * tau1 + (1 - p) * tau0
+
+    def evaluate_test(self, X_test, Y_test, W_test):
+        """
+        Evaluate base models on test data.
+        
+        Parameters:
+        - X_test (np.ndarray): Test features
+        - Y_test (np.ndarray): Test targets
+        - W_test (np.ndarray): Treatment indicators
+        
+        Returns:
+        - dict: Evaluation metrics for each base model
+        """
+        self.evaluation_test_dict = {}
+        
+        # Evaluate treated model
+        treated_eval = self.models['mu1'].evaluate(X_test[W_test == 1], Y_test[W_test == 1])
+        self.evaluation_test_dict['mu1'] = treated_eval
+        
+        # Evaluate control model
+        control_eval = self.models['mu0'].evaluate(X_test[W_test == 0], Y_test[W_test == 0])
+        self.evaluation_test_dict['mu0'] = control_eval
+
+        # Evaluate tau0 model
+        tau0_eval = self.models['tau0'].evaluate(X_test[W_test == 0], self.models['mu1'].predict(X_test[W_test == 0]) - Y_test[W_test == 0])
+        self.evaluation_test_dict['tau0'] = tau0_eval
+        # Evaluate tau1 model
+        tau1_eval = self.models['tau1'].evaluate(X_test[W_test == 1], Y_test[W_test == 1] - self.models['mu0'].predict(X_test[W_test == 1]))
+        self.evaluation_test_dict['tau1'] = tau1_eval
+
+        # Evaluate propensity model
+        propensity_eval = self._eval_propensity_model(X_test, W_test)
+        self.evaluation_test_dict['propensity'] = propensity_eval
+        
+        return self.evaluation_test_dict
+    
+    def _eval_propensity_model(self, X_test, W_test):
+        """
+        Evaluate the propensity model using accuracy.
+        
+        Parameters:
+        - X_test (np.ndarray): Test features
+        - W_test (np.ndarray): Treatment indicators
+        
+        Returns:
+        - dict: Evaluation metrics for the propensity model
+        """
+        if 'propensity' not in self.models:
+            raise ValueError("Propensity model not fitted yet.")
+        
+        y_prob = self.models['propensity'].predict_proba(X_test)[:, 1]
+        y_pred = (y_prob >= 0.5).astype(int)
+        auc = roc_auc_score(W_test, y_prob)
+        f1 = f1_score(W_test, y_pred)
+        return {'auc': auc, 'f1': f1}
