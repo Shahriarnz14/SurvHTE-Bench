@@ -3,6 +3,7 @@
 # Set variables
 REPEATS=10
 IMPUTED_PATH="real_data/imputed_times_lookup.pkl"
+TRAIN_SIZE=0.75
 
 # Define the imputation methods to loop over
 IMPUTE_METHODS=("Pseudo_obs" "Margin" "IPCW-T")
@@ -16,7 +17,7 @@ do
         echo "Running $META_LEARNER with imputation method: $METHOD"
         python run_meta_learner_impute_actg.py \
             --num_repeats $REPEATS \
-            --train_size "all" \
+            --train_size $TRAIN_SIZE \
             --meta_learner $META_LEARNER \
             --impute_method $METHOD \
             --load_imputed \
