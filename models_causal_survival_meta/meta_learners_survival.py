@@ -40,7 +40,8 @@ class BaseMetaLearnerSurvival(ABC):
         """
         pass
     
-    def evaluate_test(self, X_test, Y_test):
+    @abstractmethod
+    def evaluate_test(self, X_test, Y_test, W_test):
         """
         Evaluate base models on test data.
         
