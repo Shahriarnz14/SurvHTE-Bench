@@ -114,21 +114,21 @@ def main(args):
                 max_time = Y_train[:, 0].max()
                 
                 # Initialize the appropriate meta-learner
-                if args.meta_learner == "t_learner":
+                if args.meta_learner == "t_learner_survival":
                     learner = TLearnerSurvival(
                         base_model_name=base_model,
                         base_model_grid=hyperparameter_grids,
                         metric=args.survival_metric,
                         max_time=max_time
                     )
-                elif args.meta_learner == "s_learner":
+                elif args.meta_learner == "s_learner_survival":
                     learner = SLearnerSurvival(
                         base_model_name=base_model,
                         base_model_grid=hyperparameter_grids,
                         metric=args.survival_metric,
                         max_time=max_time
                     )
-                elif args.meta_learner == "matching_learner":
+                elif args.meta_learner == "matching_learner_survival":
                     learner = MatchingLearnerSurvival(
                         base_model_name=base_model,
                         base_model_grid=hyperparameter_grids,
@@ -205,8 +205,8 @@ if __name__ == "__main__":
     parser.add_argument("--train_size", type=int, default=5000)
     parser.add_argument("--test_size", type=int, default=5000)
     parser.add_argument("--survival_metric", type=str, default="mean", choices=["median", "mean"])
-    parser.add_argument("--meta_learner", type=str, default="t_learner", 
-                        choices=["t_learner", "s_learner", "matching_learner"])
+    parser.add_argument("--meta_learner", type=str, default="t_learner_survival", 
+                        choices=["t_learner_survival", "s_learner_survival", "matching_learner_survival"])
     parser.add_argument("--base_survival_model", type=str, default="RandomSurvivalForest",
                         choices=["RandomSurvivalForest", "DeepSurv", "DeepHit"])
     parser.add_argument("--num_matches", type=int, default=5, help="Number of matches for matching learner")
