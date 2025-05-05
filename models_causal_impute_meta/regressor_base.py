@@ -3,6 +3,7 @@ from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 from sklearn.linear_model import Ridge, Lasso
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import mean_absolute_error, r2_score
 from xgboost import XGBRegressor
 
 class RegressorBaseLearner:
@@ -100,6 +101,27 @@ class RegressorBaseLearner:
         if self.model is None:
             raise RuntimeError("Model not fit yet.")
         return self.model.predict(X)
+    
+    def evaluate(self, X_test, Y_test):
+        """
+        Evaluate model performance on test data.
+        
+        Parameters:
+        - X_test (np.ndarray): Test features
+        - Y_test (np.ndarray): Test targets (time)
+        
+        Returns:
+        - dict or float: Regression Performance metrics
+        """
+        if self.model is None:
+            raise ValueError("Model has not been fitted yet.")
+        
+        y_pred = self.model.predict(X_test)
+        
+        mae = mean_absolute_error(Y_test, y_pred)
+        r2 = r2_score(Y_test, y_pred)
+        
+        return {'mae': mae, 'r2': r2}
 
     def get_best_params(self):
         """Return the best hyperparameters found during training."""

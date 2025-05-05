@@ -141,17 +141,35 @@ def main(args):
                     learner.fit(X_train, W_train, Y_train_imputed)
                     mse_test, cate_test_pred, ate_test_pred = learner.evaluate(X_test, cate_test_true, W_test)
 
+                    # Evaluate base survival models on test data
+                    base_model_eval = learner.evaluate_test(X_test, Y_test_imputed, W_test)
+
                     results_dict[setup_name][scenario_key][base_model][rand_idx] = {
                         "cate_true": cate_test_true,
                         "cate_pred": cate_test_pred,
                         "ate_true": cate_test_true.mean(),
                         "ate_pred": ate_test_pred,
                         "cate_mse": mse_test,
-                        "ate_bias": ate_test_pred - cate_test_true.mean()
+                        "ate_bias": ate_test_pred - cate_test_true.mean(),
+                        "base_model_eval": base_model_eval, # Store base model evaluation results
                     }
 
                 end_time = time.time()
+
+                # Save results to the setup dictionary
                 avg = results_dict[setup_name][scenario_key][base_model]
+                base_model_eval_performance = {
+                                                base_model_k: 
+                                                {
+                                                    f"{stat}_{metric_j}": func([
+                                                        avg[i]['base_model_eval'][base_model_k][metric_j] for i in random_idx_col_list
+                                                        if i in avg
+                                                    ])
+                                                    for metric_j in metric_j_dict
+                                                    for stat, func in zip(['mean', 'std'], [np.nanmean, np.nanstd])
+                                                }
+                                                for base_model_k, metric_j_dict in avg[list(avg.keys())[0]]['base_model_eval'].items()
+                                            }
                 results_dict[setup_name][scenario_key][base_model]["average"] = {
                     "mean_cate_mse": np.mean([avg[i]["cate_mse"] for i in random_idx_col_list]),
                     "std_cate_mse": np.std([avg[i]["cate_mse"] for i in random_idx_col_list]),
@@ -161,7 +179,8 @@ def main(args):
                     "std_ate_true": np.std([avg[i]["ate_true"] for i in random_idx_col_list]),
                     "mean_ate_bias": np.mean([avg[i]["ate_bias"] for i in random_idx_col_list]),
                     "std_ate_bias": np.std([avg[i]["ate_bias"] for i in random_idx_col_list]),
-                    "runtime": (end_time - start_time) / len(random_idx_col_list)
+                    "runtime": (end_time - start_time) / len(random_idx_col_list),
+                    "base_model_eval": base_model_eval_performance
                 }
 
             with open(output_pickle_path, "wb") as f:
