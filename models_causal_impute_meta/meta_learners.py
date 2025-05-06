@@ -1,8 +1,9 @@
 from abc import ABC, abstractmethod
 from sklearn.metrics import mean_squared_error
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import roc_auc_score, f1_score
+from sklearn.metrics import roc_auc_score, f1_score, mean_absolute_error, r2_score
 import numpy as np
+from econml.dr import DRLearner
 from .regressor_base import RegressorBaseLearner
 
 class BaseMetaLearner(ABC):
@@ -241,3 +242,73 @@ class XLearner(BaseMetaLearner):
         auc = roc_auc_score(W_test, y_prob)
         f1 = f1_score(W_test, y_pred)
         return {'auc': auc, 'f1': f1}
+
+
+class DR_Learner(BaseMetaLearner):
+    """
+    DR-Learner: Doubly robust learner using a single model_final.
+    """
+    def fit(self, X_train, W_train, Y_train):
+        # base_model_final = RegressorBaseLearner(model_name=self.base_model_name)
+        # model_final = base_model_final.grid_search  # assume this returns a scikit-learn-style estimator
+
+        # base_model_regression = RegressorBaseLearner(model_name=self.base_model_name)
+        # model_regression = base_model_regression.grid_search  # assume this returns a scikit-learn-style estimator
+
+        # define the model_final and model_regression based on the base_model_name
+        from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+        from sklearn.linear_model import Ridge, Lasso
+        from xgboost import XGBRegressor
+        if self.base_model_name == 'ridge':
+            model_final = Ridge()
+            model_regression = Ridge()
+        elif self.base_model_name == 'lasso':
+            model_final = Lasso()
+            model_regression = Lasso()
+        elif self.base_model_name == 'rf':
+            model_final = RandomForestRegressor(random_state=42)
+            model_regression = RandomForestRegressor(random_state=42)
+        elif self.base_model_name == 'gbr':
+            model_final = GradientBoostingRegressor(random_state=42)
+            model_regression = GradientBoostingRegressor(random_state=42)
+        elif self.base_model_name == 'xgb':
+            model_final = XGBRegressor(random_state=42, verbosity=0, n_jobs=-1)
+            model_regression = XGBRegressor(random_state=42, verbosity=0, n_jobs=-1)
+        else:
+            raise ValueError(f"Unsupported model name: {self.base_model_name}")
+
+        self.model = DRLearner(
+            model_regression=model_regression,
+            # model_propensity=LogisticRegression(),
+            model_final=model_final,
+            random_state=42,
+        )
+        self.model.fit(Y_train, W_train, X=X_train)
+
+    def predict_cate(self, X):
+        return self.model.effect(X)
+
+    def evaluate_test(self, X_test, Y_test, W_test):
+        # DRLearner does not expose base models the way T-/S-/X-Learners do
+        # We can only evaluate some parts of the model
+        model_regression_eval = { 
+                                    'mae': np.mean([mean_absolute_error(fold_model.predict(np.column_stack((X_test, W_test))), Y_test) 
+                                                    for fold_model in self.model.models_regression[0]]),
+                                    'r2': np.mean([r2_score(fold_model.predict(np.column_stack((X_test, W_test))), Y_test)
+                                                   for fold_model in self.model.models_regression[0]])
+                                }
+
+        model_propensity_eval = { 
+                                    'auc': np.mean([roc_auc_score(W_test, fold_model.predict_proba(X_test)[:, 1])
+                                                    for fold_model in self.model.models_propensity[0]]),
+                                    'f1': np.mean([f1_score(W_test, (fold_model.predict_proba(X_test)[:, 1] >= 0.5).astype(int))
+                                                   for fold_model in self.model.models_propensity[0]])
+                                }
+        
+        # Store evaluations in a dictionary
+        self.evaluation_test_dict = {'model_regression': model_regression_eval,
+                                     'propensity': model_propensity_eval}
+        
+        return self.evaluation_test_dict
+
+

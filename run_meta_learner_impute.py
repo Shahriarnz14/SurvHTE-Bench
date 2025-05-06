@@ -5,7 +5,7 @@ import numpy as np
 import pickle
 import time
 from tqdm import tqdm
-from models_causal_impute_meta.meta_learners import TLearner, SLearner, XLearner
+from models_causal_impute_meta.meta_learners import TLearner, SLearner, XLearner, DR_Learner
 from models_causal_impute_meta.survival_eval_impute import SurvivalEvalImputer
 
 def load_scenario_data(h5_file_path, scenario_num):
@@ -143,7 +143,7 @@ def main(args):
                             print(f"[Warning]: For {args.meta_learner}, No event in control group. Skipping iteration {rand_idx}.")
                             continue
 
-                    learner_cls = {"t_learner": TLearner, "s_learner": SLearner, "x_learner": XLearner}[args.meta_learner]
+                    learner_cls = {"t_learner": TLearner, "s_learner": SLearner, "x_learner": XLearner, "dr_learner": DR_Learner}[args.meta_learner]
                     learner = learner_cls(base_model_name=base_model)
 
                     learner.fit(X_train, W_train, Y_train_imputed)
@@ -209,7 +209,7 @@ if __name__ == "__main__":
     parser.add_argument("--train_size", type=int, default=5000)
     parser.add_argument("--test_size", type=int, default=5000)
     parser.add_argument("--impute_method", type=str, default="Pseudo_obs", choices=["Pseudo_obs", "Margin", "IPCW-T"])
-    parser.add_argument("--meta_learner", type=str, default="t_learner", choices=["t_learner", "s_learner", "x_learner"])
+    parser.add_argument("--meta_learner", type=str, default="t_learner", choices=["t_learner", "s_learner", "x_learner", "dr_learner"])
     parser.add_argument("--load_imputed", action="store_true")
     parser.add_argument("--imputed_path", type=str, default="synthetic_data/imputed_times_lookup.pkl")
     args = parser.parse_args()
