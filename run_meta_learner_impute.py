@@ -135,6 +135,14 @@ def main(args):
                         survival_imputer = SurvivalEvalImputer(imputation_method=args.impute_method)
                         _, Y_test_imputed = survival_imputer.fit_transform(Y_train, Y_test, impute_train=False)
 
+                    if args.meta_learner in ["t_learner", "x_learner"]:
+                        if Y_train[W_train == 1, 1].sum() <= 1:
+                            print(f"[Warning]: For {args.meta_learner}, No event in treatment group. Skipping iteration {rand_idx}.")
+                            continue
+                        if Y_train[W_train == 0, 1].sum() <= 1:
+                            print(f"[Warning]: For {args.meta_learner}, No event in control group. Skipping iteration {rand_idx}.")
+                            continue
+
                     learner_cls = {"t_learner": TLearner, "s_learner": SLearner, "x_learner": XLearner}[args.meta_learner]
                     learner = learner_cls(base_model_name=base_model)
 
@@ -156,6 +164,10 @@ def main(args):
 
                 end_time = time.time()
 
+                if len(results_dict[setup_name][scenario_key][base_model]) == 0:
+                    print(f"[Warning]: No valid results for {setup_name}, {scenario_key}, {base_model}. Skipping.")
+                    continue
+
                 # Save results to the setup dictionary
                 avg = results_dict[setup_name][scenario_key][base_model]
                 base_model_eval_performance = {
@@ -171,15 +183,15 @@ def main(args):
                                                 for base_model_k, metric_j_dict in avg[list(avg.keys())[0]]['base_model_eval'].items()
                                             }
                 results_dict[setup_name][scenario_key][base_model]["average"] = {
-                    "mean_cate_mse": np.mean([avg[i]["cate_mse"] for i in random_idx_col_list]),
-                    "std_cate_mse": np.std([avg[i]["cate_mse"] for i in random_idx_col_list]),
-                    "mean_ate_pred": np.mean([avg[i]["ate_pred"] for i in random_idx_col_list]),
-                    "std_ate_pred": np.std([avg[i]["ate_pred"] for i in random_idx_col_list]),
-                    "mean_ate_true": np.mean([avg[i]["ate_true"] for i in random_idx_col_list]),
-                    "std_ate_true": np.std([avg[i]["ate_true"] for i in random_idx_col_list]),
-                    "mean_ate_bias": np.mean([avg[i]["ate_bias"] for i in random_idx_col_list]),
-                    "std_ate_bias": np.std([avg[i]["ate_bias"] for i in random_idx_col_list]),
-                    "runtime": (end_time - start_time) / len(random_idx_col_list),
+                    "mean_cate_mse": np.mean([avg[i]["cate_mse"] for i in random_idx_col_list if i in avg]),
+                    "std_cate_mse": np.std([avg[i]["cate_mse"] for i in random_idx_col_list if i in avg]),
+                    "mean_ate_pred": np.mean([avg[i]["ate_pred"] for i in random_idx_col_list if i in avg]),
+                    "std_ate_pred": np.std([avg[i]["ate_pred"] for i in random_idx_col_list if i in avg]),
+                    "mean_ate_true": np.mean([avg[i]["ate_true"] for i in random_idx_col_list if i in avg]),
+                    "std_ate_true": np.std([avg[i]["ate_true"] for i in random_idx_col_list if i in avg]),
+                    "mean_ate_bias": np.mean([avg[i]["ate_bias"] for i in random_idx_col_list if i in avg]),
+                    "std_ate_bias": np.std([avg[i]["ate_bias"] for i in random_idx_col_list if i in avg]),
+                    "runtime": (end_time - start_time) / len(avg) if len(avg) > 0 else 0,
                     "base_model_eval": base_model_eval_performance
                 }
 
