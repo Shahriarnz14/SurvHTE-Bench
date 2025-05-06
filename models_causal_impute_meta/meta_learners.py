@@ -75,8 +75,10 @@ class TLearner(BaseMetaLearner):
     T-Learner: Trains separate models for treated and control groups.
     """
     def fit(self, X_train, W_train, Y_train):
-        model_treated = RegressorBaseLearner(model_name=self.base_model_name)
-        model_control = RegressorBaseLearner(model_name=self.base_model_name)
+        # number of cross-validation folds should be smaller than the number of samples in the treated group
+        num_cv = 5 if len(X_train[W_train == 1]) > 5 else 2
+        model_treated = RegressorBaseLearner(model_name=self.base_model_name, cv=num_cv)
+        model_control = RegressorBaseLearner(model_name=self.base_model_name, cv=num_cv)
         model_treated.fit(X_train[W_train == 1], Y_train[W_train == 1])
         model_control.fit(X_train[W_train == 0], Y_train[W_train == 0])
         self.models['treated'] = model_treated
@@ -159,8 +161,10 @@ class XLearner(BaseMetaLearner):
     then combines with a propensity model.
     """
     def fit(self, X_train, W_train, Y_train):
-        mu1 = RegressorBaseLearner(model_name=self.base_model_name)
-        mu0 = RegressorBaseLearner(model_name=self.base_model_name)
+        # number of cross-validation folds should be smaller than the number of samples in the treated group
+        num_cv = 5 if len(X_train[W_train == 1]) > 5 else 2
+        mu1 = RegressorBaseLearner(model_name=self.base_model_name, cv=num_cv)
+        mu0 = RegressorBaseLearner(model_name=self.base_model_name, cv=num_cv)
         mu1.fit(X_train[W_train == 1], Y_train[W_train == 1])
         mu0.fit(X_train[W_train == 0], Y_train[W_train == 0])
         self.models['mu1'], self.models['mu0'] = mu1, mu0
@@ -168,8 +172,8 @@ class XLearner(BaseMetaLearner):
         tau0 = mu1.predict(X_train[W_train == 0]) - Y_train[W_train == 0]
         tau1 = Y_train[W_train == 1] - mu0.predict(X_train[W_train == 1])
 
-        tau0_model = RegressorBaseLearner(model_name=self.base_model_name)
-        tau1_model = RegressorBaseLearner(model_name=self.base_model_name)
+        tau0_model = RegressorBaseLearner(model_name=self.base_model_name, cv=num_cv)
+        tau1_model = RegressorBaseLearner(model_name=self.base_model_name, cv=num_cv)
         tau0_model.fit(X_train[W_train == 0], tau0)
         tau1_model.fit(X_train[W_train == 1], tau1)
         self.models['tau0'] = tau0_model
