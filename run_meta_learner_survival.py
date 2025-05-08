@@ -70,7 +70,8 @@ def main(args):
     experiment_repeat_setups = pd.read_csv("synthetic_data/idx_split.csv").set_index("idx")
     random_idx_col_list = experiment_repeat_setups.columns.to_list()[:args.num_repeats]
 
-    output_pickle_path = f"results/{args.meta_learner}_{args.base_survival_model}_{args.survival_metric}_repeats_{args.num_repeats}_train_{args.train_size}.pkl"
+    output_pickle_path = f"results/synthetic_data/models_causal_survival_meta/{args.meta_learner}/"
+    output_pickle_path += f"{args.meta_learner}_{args.base_survival_model}_repeats_{args.num_repeats}_train_{args.train_size}.pkl"
     print("Output results path:", output_pickle_path)
 
     # Define base survival models to use

@@ -449,7 +449,7 @@ class SurvivalModelBase:
         try:
             ibs = get_integrated_brier_score(self.survival_train, self.survival_test, surv, times)
         except Exception as e:
-            print(f"[Warning]: Error calculating integrated brier score for the current random-seed. (Base-learner result of this repeat will be excluded): {str(e)}")
+            # print(f"[Warning]: Error calculating integrated brier score for the current random-seed. (Base-learner result of this repeat will be excluded): {str(e)}")
             ibs = np.nan
             
         # # Calculate time-dependent AUC with exception handling
