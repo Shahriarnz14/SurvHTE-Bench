@@ -66,7 +66,7 @@ def main(args):
     experiment_repeat_setups = pd.read_csv("synthetic_data/idx_split.csv").set_index("idx")
     random_idx_col_list = experiment_repeat_setups.columns.to_list()[:args.num_repeats]
 
-    output_pickle_path = f"results/dml_learner/{args.dml_learner}_{args.impute_method}_repeats_{args.num_repeats}_train_{args.train_size}.pkl"
+    output_pickle_path = f"results/synthetic_data/dml_learner/{args.dml_learner}_{args.impute_method}_repeats_{args.num_repeats}_train_{args.train_size}.pkl"
     print("Output results path:", output_pickle_path)
 
     results_dict = {}
