@@ -5,7 +5,7 @@
 
 # Get arguments or set defaults
 SURVIVAL_METHODS=("RandomSurvivalForest" "DeepSurv" "DeepHit")
-META_LEARNERS=("t_learner" "s_learner" "matching_learner")
+META_LEARNERS=("t_learner_survival" "s_learner_survival" "matching_learner_survival")
 
 # Constants
 REPEATS=10
