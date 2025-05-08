@@ -2,54 +2,69 @@
 
 ## Synthetic Data Generation and save to h5 file
 ``` python
+from data import SyntheticDataGeneratorPlus
+
 ### RCT with treatment rate 0.5
-with pd.HDFStore("synthetic_data/RCT_0_5.h5") as store:
+with pd.HDFStore("../synthetic_data/RCT_0_5.h5") as store:
     for i in range(1,11):
-        if i in [4,7]:
+        if i in [3,4,6,7,10]:
             continue
         dataset_name = f'RCT_0_5_scenario_{i}'
         gen = SyntheticDataGeneratorPlus(scenario=i, dataset_name=dataset_name,
                                          n_samples=50000, random_state=2025,
-                                         RCT=True, treatment_proportion=0.5, unobserved=False)
+                                         RCT=True, treatment_proportion=0.5, unobserved=False, overlap=True)
         dsets = gen.generate_datasets() 
         store[f"scenario_{i}/data"] = dsets['data']
         store.get_storer(f"scenario_{i}/data").attrs.metadata = dsets['metadata']
 
 ### RCT with treatment rate 0.05
-with pd.HDFStore("synthetic_data/RCT_0_05.h5") as store:
+with pd.HDFStore("../synthetic_data/RCT_0_05.h5") as store:
     for i in range(1,11):
-        if i in [4,7]:
+        if i in [3,4,6,7,10]:
             continue
         dataset_name = f'RCT_0_05_scenario_{i}'
         gen = SyntheticDataGeneratorPlus(scenario=i, dataset_name=dataset_name,
                                          n_samples=50000, random_state=2025,
-                                         RCT=True, treatment_proportion=0.05, unobserved=False)
+                                         RCT=True, treatment_proportion=0.05, unobserved=False, overlap=True)
         dsets = gen.generate_datasets() 
         store[f"scenario_{i}/data"] = dsets['data']
         store.get_storer(f"scenario_{i}/data").attrs.metadata = dsets['metadata']
 
-### non-RCT with ignorability held - propensity score e(X)
-with pd.HDFStore("synthetic_data/e_X.h5") as store:
+### non-RCT with ignorability and overlap held - propensity score e(X)
+with pd.HDFStore("../synthetic_data/e_X.h5") as store:
     for i in range(1,11):
-        if i in [4,7]:
+        if i in [3,4,6,7,10]:
             continue
         dataset_name = f'e_X_scenario_{i}'
         gen = SyntheticDataGeneratorPlus(scenario=i, dataset_name=dataset_name,
                                         n_samples=50000, random_state=2025,
-                                         RCT=False, unobserved=False)
+                                         RCT=False, unobserved=False, overlap=True)
         dsets = gen.generate_datasets()
-        store[f"scenario_{i}/data"] = dsets['data']
+        store[f"../scenario_{i}/data"] = dsets['data']
         store.get_storer(f"scenario_{i}/data").attrs.metadata = dsets['metadata']
 
-### non-RCT with ignorability violated - propensity score e(X, U)
+### non-RCT with ignorability violated and overlap held - propensity score e(X, U)
 with pd.HDFStore("synthetic_data/e_X_U.h5") as store:
     for i in range(1,11):
-        if i in [4,7]:
+        if i in [3,4,6,7,10]:
             continue
         dataset_name = f'e_X_U_scenario_{i}'
         gen = SyntheticDataGeneratorPlus(scenario=i, dataset_name=dataset_name,
                                          n_samples=50000, random_state=2025,
-                                         RCT=False, unobserved=True)
+                                         RCT=False, unobserved=True, overlap=True)
+        dsets = gen.generate_datasets()
+        store[f"scenario_{i}/data"] = dsets['data']
+        store.get_storer(f"scenario_{i}/data").attrs.metadata = dsets['metadata']
+
+### non-RCT with ignorability held but overlap violated - propensity score e(X)_no_overlap
+with pd.HDFStore("../synthetic_data/e_X_no_overlap.h5") as store:
+    for i in range(1,11):
+        if i in [3,4,6,7,10]:
+            continue
+        dataset_name = f'e_X_no_overlap_scenario_{i}'
+        gen = SyntheticDataGeneratorPlus(scenario=i, dataset_name=dataset_name,
+                                        n_samples=50000, random_state=2025,
+                                         RCT=False, unobserved=False, overlap=False)
         dsets = gen.generate_datasets()
         store[f"scenario_{i}/data"] = dsets['data']
         store.get_storer(f"scenario_{i}/data").attrs.metadata = dsets['metadata']
@@ -58,28 +73,48 @@ with pd.HDFStore("synthetic_data/e_X_U.h5") as store:
 info_censor_baseline=0.1
 info_censor_alpha=0.05
 
-with pd.HDFStore("synthetic_data/e_X_info_censor.h5") as store:
+### informative_censoring and non-RCT with ignorability and overlap held - propensity score e(X)
+with pd.HDFStore("../synthetic_data/e_X_info_censor.h5") as store:
     for i in range(1,11):
-        if i in [4,5,6,7,10]:
+        if i in [3,4,6,7,10]:
             continue
         dataset_name = f'e_X_info_censor_scenario_{i}'
         gen = SyntheticDataGeneratorPlus(scenario=i, dataset_name=dataset_name,
                                          n_samples=50000, random_state=2025,
-                                         RCT=False, unobserved=False, informative_censoring=True,
+                                         informative_censoring=True, RCT=False, 
+                                         unobserved=False, overlap=True,
                                          info_censor_baseline=info_censor_baseline,
                                          info_censor_alpha=info_censor_alpha)
         dsets = gen.generate_datasets() 
         store[f"scenario_{i}/data"] = dsets['data']
         store.get_storer(f"scenario_{i}/data").attrs.metadata = dsets['metadata']
 
-with pd.HDFStore("synthetic_data/e_X_U_info_censor.h5") as store:
+### informative_censoring and non-RCT with ignorability violated and overlap held - propensity score e(X, U)
+with pd.HDFStore("../synthetic_data/e_X_U_info_censor.h5") as store:
     for i in range(1,11):
-        if i in [4,5,6,7,10]:
+        if i in [3,4,6,7,10]:
             continue
         dataset_name = f'e_X_U_info_censor_scenario_{i}'
         gen = SyntheticDataGeneratorPlus(scenario=i, dataset_name=dataset_name,
                                          n_samples=50000, random_state=2025,
-                                         RCT=False, unobserved=True, informative_censoring=True,
+                                         informative_censoring=True, RCT=False, 
+                                         unobserved=True, overlap=True,
+                                         info_censor_baseline=info_censor_baseline,
+                                         info_censor_alpha=info_censor_alpha)
+        dsets = gen.generate_datasets() 
+        store[f"scenario_{i}/data"] = dsets['data']
+        store.get_storer(f"scenario_{i}/data").attrs.metadata = dsets['metadata']
+
+### informative_censoring and non-RCT with ignorability held but overlap violated - propensity score e(X)
+with pd.HDFStore("../synthetic_data/e_X_no_overlap_info_censor.h5") as store:
+    for i in range(1,11):
+        if i in [3,4,6,7,10]:
+            continue
+        dataset_name = f'e_X_no_overlap_info_censor_scenario_{i}'
+        gen = SyntheticDataGeneratorPlus(scenario=i, dataset_name=dataset_name,
+                                         n_samples=50000, random_state=2025,
+                                         informative_censoring=True, RCT=False, 
+                                         unobserved=False, overlap=False,
                                          info_censor_baseline=info_censor_baseline,
                                          info_censor_alpha=info_censor_alpha)
         dsets = gen.generate_datasets() 
@@ -95,37 +130,31 @@ import ace_tools_open as tools
 
 # List of HDF5 files to summarize
 store_files = [
-    "synthetic_data/RCT_0_5.h5",
-    "synthetic_data/RCT_0_05.h5",
-    "synthetic_data/e_X.h5",
-    "synthetic_data/e_X_U.h5",
-    "synthetic_data/e_X_info_censor.h5",
-    "synthetic_data/e_X_U_info_censor.h5"
+    "../synthetic_data/RCT_0_5.h5",
+    "../synthetic_data/RCT_0_05.h5",
+    "../synthetic_data/e_X.h5",
+    "../synthetic_data/e_X_U.h5",
+    "../synthetic_data/e_X_no_overlap.h5",
+    "../synthetic_data/e_X_info_censor.h5",
+    "../synthetic_data/e_X_U_info_censor.h5",
+    "../synthetic_data/e_X_no_overlap_info_censor.h5"
 ]
 
-records = []
-for fname in store_files:
-    with pd.HDFStore(fname) as store:
-        for scenario in range(1, 11):
-            key = f"scenario_{scenario}/data"
-            if key in store:
-                df = store[key]
-                metadata = store.get_storer(key).attrs.metadata
-                max_time = df["observed_time"].max()
-                censor_rate = 1 - df["event"].mean()
-                treat_rate = df["W"].mean()
-                n_samples = len(df)
-                records.append({
-                    "file": fname,
-                    "scenario": scenario,
-                    "n_samples": n_samples,
-                    "max_observed_time": max_time,
-                    "censoring_rate": censor_rate,
-                    "treatment_rate": treat_rate
-                })
+experiment_setups = {}
 
-summary_df = pd.DataFrame(records)
-tools.display_dataframe_to_user("Simulation Summary Metrics", summary_df)
+for path in store_files:
+    base_name = os.path.splitext(os.path.basename(path))[0]  # e.g. RCT_0_5
+    scenario_dict = {}
+    for scenario in range(1, 11):
+        try:
+            result = load_scenario_data(path, scenario)
+            if result is not None:
+                scenario_dict[f"scenario_{scenario}"] = result
+        except Exception as e:
+            # Log or ignore as needed
+            print(f"Error loading scenario {scenario} from {path}: {e}")
+            continue
+    experiment_setups[base_name] = scenario_dict
 ```
 
 
