@@ -127,7 +127,7 @@ class SyntheticDataGeneratorPlus:
         eps = np.random.normal(size=len(df)) # TODO: why some with eps, some without?
 
         U = df[['U1', 'U2']].values
-        U_counfounder = U[:, 0] if self.unobserved else np.zeros(len(U))
+        U_counfounder = (U[:, 0] - X[:, 1]) if self.unobserved else np.zeros(len(U))
 
         # Cox-based T for scenarios 2 & 10
         if s in (2, 10):

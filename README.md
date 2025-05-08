@@ -127,3 +127,6 @@ for fname in store_files:
 summary_df = pd.DataFrame(records)
 tools.display_dataframe_to_user("Simulation Summary Metrics", summary_df)
 ```
+
+
+The R implementation (`models_causal_impute_meta/RISTfunctions.r`) for RIST is downloaded from this [link](https://www.dropbox.com/scl/fi/mtfch9t0ogrww2nhz8bl0/RISTfunctions.r?rlkey=mq2ey6nmbvmavnp52b7oeq77n&e=1&dl=0), and can also be found under one of the authors of RIST, Ruoqing Zhu's [webpage](https://sites.google.com/site/teazrq/software?authuser=0)
