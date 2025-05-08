@@ -472,7 +472,7 @@ class SurvivalEvalImputer:
         assert np.all(best_guesses[Y_test[:, 1] == 1] == test_event_times[test_event_indicators]), "Best guesses should be less than or equal to event times"
 
         if impute_train:
-            best_guesses_train = self._margin_imputation_train(Y_train)
+            best_guesses_train = self._ipcw_t_imputation_train(Y_train)
         else:
             best_guesses_train = Y_train[:, 0].copy()
 
