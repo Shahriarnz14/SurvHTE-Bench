@@ -21,7 +21,7 @@ do
         --num_repeats $REPEATS \
         --train_size $TRAIN_SIZE \
         --test_size $TEST_SIZE \
-        --dml_learner $DIRECT_LEARNER \
+        --dml_learner $DML_LEARNER \
         --impute_method $METHOD \
         --load_imputed \
         --imputed_path $IMPUTED_PATH
