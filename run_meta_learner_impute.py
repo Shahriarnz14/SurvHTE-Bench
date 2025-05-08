@@ -97,7 +97,8 @@ def main(args):
     experiment_repeat_setups = pd.read_csv("synthetic_data/idx_split.csv").set_index("idx")
     random_idx_col_list = experiment_repeat_setups.columns.to_list()[:args.num_repeats]
 
-    output_pickle_path = f"results/synthetic_data/meta_learner/{args.meta_learner}_{args.impute_method}_repeats_{args.num_repeats}_train_{args.train_size}.pkl"
+    output_pickle_path = f"results/synthetic_data/models_causal_impute/meta_learner/{args.meta_learner}/"
+    output_pickle_path += f"{args.meta_learner}_{args.impute_method}_repeats_{args.num_repeats}_train_{args.train_size}.pkl"
     print("Output results path:", output_pickle_path)
 
     # base_regressors = ['ridge', 'lasso', 'rf', 'gbr', 'xgb']
