@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Usage:
-# ./run_meta_learners_impute.sh t_learner 5000
+# ./scripts/run_meta_learners_impute.sh t_learner 5000
 
 # Get arguments or set defaults
 META_LEARNER=${1:-t_learner}
