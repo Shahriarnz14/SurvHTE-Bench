@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Usage:
-# ./run_meta_learners_survival.sh t_learner_survival 5000
+# ./scripts/run_meta_learners_survival.sh t_learner_survival 5000
 
 # Get arguments or set defaults
 META_LEARNER=${1:-t_learner_survival}
